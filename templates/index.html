@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZKTeco Live Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #00ff41; }
+        .header { background: #111; padding: 15px 30px; border-bottom: 2px solid #00ff41; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; letter-spacing: 2px; }
+        .status { font-size: 13px; color: #888; }
+        .status .dot { display: inline-block; width: 8px; height: 8px; background: #00ff41; border-radius: 50%; margin-right: 5px; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .container { display: grid; grid-template-columns: 250px 1fr; height: calc(100vh - 55px); }
+        .sidebar { background: #111; border-right: 1px solid #222; padding: 20px; overflow-y: auto; }
+        .sidebar h3 { font-size: 12px; color: #555; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; }
+        .device-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+        .device-card .sn { font-weight: bold; color: #00ff41; font-size: 14px; }
+        .device-card .ip { color: #888; font-size: 11px; margin-top: 4px; }
+        .device-card .time { color: #555; font-size: 10px; margin-top: 2px; }
+        .main { display: flex; flex-direction: column; }
+        .tabs { display: flex; background: #111; border-bottom: 1px solid #222; }
+        .tab { padding: 12px 25px; cursor: pointer; font-size: 13px; color: #666; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #aaa; }
+        .tab.active { color: #00ff41; border-bottom-color: #00ff41; }
+        .content { flex: 1; overflow-y: auto; padding: 15px; }
+        .log-entry { font-family: 'Consolas', monospace; font-size: 13px; padding: 8px 12px; border-bottom: 1px solid #1a1a1a; display: flex; gap: 15px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { background: #001a00; } to { background: transparent; } }
+        .log-entry:hover { background: #111; }
+        .log-entry .time { color: #555; min-width: 150px; }
+        .log-entry .sn { color: #00ff41; min-width: 100px; }
+        .log-entry .data { color: #ccc; flex: 1; word-break: break-all; }
+        .empty { color: #333; text-align: center; margin-top: 100px; font-size: 14px; }
+        .count { background: #00ff41; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ZKTECO LIVE MONITOR</h1>
+        <div class="status">
+            <span class="dot"></span>
+            <span id="conn-status">Waiting for device...</span>
+        </div>
+    </div>
+    <div class="container">
+        <div class="sidebar">
+            <h3>Devices <span class="count" id="dev-count">0</span></h3>
+            <div id="devices"></div>
+        </div>
+        <div class="main">
+            <div class="tabs">
+                <div class="tab active" id="tab-logs" onclick="switchTab('logs')">Attendance Logs <span class="count" id="log-count">0</span></div>
+                <div class="tab" id="tab-users" onclick="switchTab('users')">Users <span class="count" id="user-count">0</span></div>
+            </div>
+            <div class="content" id="content">
+                <div class="empty">Waiting for device data...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'logs';
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            render();
+        }
+
+        function render() {
+            fetch('/api/data').then(r => r.json()).then(data => {
+                let devHtml = '';
+                for (let sn in data.devices) {
+                    let d = data.devices[sn];
+                    devHtml += `<div class="device-card">
+                        <div class="sn">${d.sn}</div>
+                        <div class="ip">${d.ip}</div>
+                        <div class="time">Last: ${d.last}</div>
+                    </div>`;
+                }
+                document.getElementById('devices').innerHTML = devHtml || '<div class="empty">No devices</div>';
+                document.getElementById('dev-count').textContent = Object.keys(data.devices).length;
+
+                if (Object.keys(data.devices).length > 0) {
+                    document.getElementById('conn-status').textContent = 'Device Connected';
+                }
+
+                let items = currentTab === 'logs' ? data.logs : data.users;
+                let html = '';
+                for (let item of items) {
+                    html += `<div class="log-entry">
+                        <span class="time">${item.time}</span>
+                        <span class="sn">${item.sn}</span>
+                        <span class="data">${item.data}</span>
+                    </div>`;
+                }
+                document.getElementById('content').innerHTML = html || '<div class="empty">Waiting for data...</div>';
+                document.getElementById('log-count').textContent = data.logs.length;
+                document.getElementById('user-count').textContent = data.users.length;
+            });
+        }
+
+        setInterval(render, 2000);
+        render(); 
+    </script>
+</body>
+</html>
