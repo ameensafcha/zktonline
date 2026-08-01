@@ -33,6 +33,11 @@
         .log-entry .data { color: #ccc; flex: 1; word-break: break-all; }
         .empty { color: #333; text-align: center; margin-top: 100px; font-size: 14px; }
         .count { background: #00ff41; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 8px; }
+        .toolbar { padding: 12px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 12px; }
+        .fetch-btn { background: #00ff41; color: #000; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        .fetch-btn:hover { background: #00cc34; }
+        .fetch-msg { color: #888; font-size: 12px; }
+        .head-row { color: #555 !important; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -61,6 +66,26 @@
 
     <script>
         let currentTab = 'logs';
+        let fetchMsg = '';
+        let logsMsg = '';
+
+        function fetchUsers() {
+            fetchMsg = 'Command bhej raha hoon...';
+            render();
+            fetch('/api/fetch_users', { method: 'POST' })
+                .then(r => r.json())
+                .then(d => { fetchMsg = d.msg || (d.ok ? 'Sent' : 'Error'); render(); })
+                .catch(() => { fetchMsg = 'Network error'; render(); });
+        }
+
+        function fetchLogs() {
+            logsMsg = 'Purana data maang raha hoon...';
+            render();
+            fetch('/api/fetch_logs', { method: 'POST' })
+                .then(r => r.json())
+                .then(d => { logsMsg = d.msg || (d.ok ? 'Sent' : 'Error'); render(); })
+                .catch(() => { logsMsg = 'Network error'; render(); });
+        }
 
         function switchTab(tab) {
             currentTab = tab;
@@ -87,16 +112,42 @@
                     document.getElementById('conn-status').textContent = 'Device Connected';
                 }
 
-                let items = currentTab === 'logs' ? data.logs : data.users;
-                let html = '';
-                for (let item of items) {
-                    html += `<div class="log-entry">
-                        <span class="time">${item.time}</span>
-                        <span class="sn">${item.sn}</span>
-                        <span class="data">${item.data}</span>
+                if (currentTab === 'users') {
+                    let html = `<div class="toolbar">
+                        <button class="fetch-btn" onclick="fetchUsers()">&#8635; Fetch Users from Device</button>
+                        <span class="fetch-msg">${fetchMsg}</span>
                     </div>`;
+                    if (data.users.length === 0) {
+                        html += '<div class="empty">No users yet — click "Fetch Users from Device"</div>';
+                    } else {
+                        html += `<div class="log-entry head-row"><span class="sn">ID</span><span class="data">Name</span><span class="time">Card</span></div>`;
+                        for (let u of data.users) {
+                            html += `<div class="log-entry">
+                                <span class="sn">${u.pin}</span>
+                                <span class="data">${u.name}</span>
+                                <span class="time">${u.card || '-'}</span>
+                            </div>`;
+                        }
+                    }
+                    document.getElementById('content').innerHTML = html;
+                } else {
+                    let html = `<div class="toolbar">
+                        <button class="fetch-btn" onclick="fetchLogs()">&#8635; Fetch All Old Logs</button>
+                        <span class="fetch-msg">${logsMsg}</span>
+                    </div>`;
+                    if (data.logs.length === 0) {
+                        html += '<div class="empty">Waiting for data...</div>';
+                    } else {
+                        for (let item of data.logs) {
+                            html += `<div class="log-entry">
+                                <span class="time">${item.time}</span>
+                                <span class="sn">${item.sn}</span>
+                                <span class="data">${item.data}</span>
+                            </div>`;
+                        }
+                    }
+                    document.getElementById('content').innerHTML = html;
                 }
-                document.getElementById('content').innerHTML = html || '<div class="empty">Waiting for data...</div>';
                 document.getElementById('log-count').textContent = data.logs.length;
                 document.getElementById('user-count').textContent = data.users.length;
             });
